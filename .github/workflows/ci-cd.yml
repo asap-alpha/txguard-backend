@@ -1,0 +1,132 @@
+# CI/CD for the TxGuard backend.
+#
+# Scope: main only.
+#   PR → main    → build + test (guards the branch; nothing is deployed)
+#   push to main → build + test, then deploy to the VM
+#
+# Deploy runs only after build+test pass, so a red build can never ship.
+# Work on other branches runs no CI — run `dotnet test` locally before opening a PR.
+
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch: # allows a manual redeploy from the Actions tab
+
+env:
+  DOTNET_VERSION: "8.0.x"
+  DOTNET_NOLOGO: "true"
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: "true"
+
+jobs:
+  # ── Build + unit tests ────────────────────────────────────────────────────
+  build-test:
+    name: Build & test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      # Cache NuGet by lockfile-ish key so restores are fast on repeat runs.
+      - uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj') }}
+          restore-keys: nuget-${{ runner.os }}-
+
+      - name: Restore
+        run: dotnet restore TxGuard.sln
+
+      - name: Build
+        run: dotnet build TxGuard.sln -c Release --no-restore
+
+      - name: Test
+        run: dotnet test TxGuard.sln -c Release --no-build --verbosity normal
+
+  # ── Verify the container image still builds ───────────────────────────────
+  # The API is deployed as a container, so a Dockerfile regression is a shipping
+  # blocker even when `dotnet build` is green.
+  docker-build:
+    name: Docker image builds
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ── Deploy (main only) ────────────────────────────────────────────────────
+  deploy:
+    name: Deploy to VM
+    runs-on: ubuntu-latest
+    needs: [build-test, docker-build]
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    concurrency:
+      group: deploy-production # never let two deploys race on the same host
+      cancel-in-progress: false
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "${{ secrets.DEPLOY_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
+
+      # --delete keeps the server clean, and --exclude protects files that only
+      # exist on the host: the .env holding every secret, and build artefacts.
+      - name: Sync source to VM
+        run: |
+          rsync -az --delete \
+            --exclude 'bin/' --exclude 'obj/' --exclude '.git/' \
+            --exclude '.idea/' --exclude '*.user' --exclude '.env' \
+            -e "ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes" \
+            ./ "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:/opt/txguard/backend/"
+
+      - name: Rebuild and restart stack
+        run: |
+          ssh -i ~/.ssh/deploy_key -o BatchMode=yes \
+            "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" \
+            'set -e
+             cd /opt/txguard/backend/deploy/vm
+             docker compose up -d --build
+             # Caddy mounts its config, so a changed Caddyfile needs an explicit reload.
+             docker compose restart caddy
+             docker image prune -f'
+
+      # A green deploy step only means the commands exited 0. Prove the service is
+      # actually serving, and that the Temporal worker reconnected after restart.
+      - name: Smoke test
+        run: |
+          set -e
+          for i in $(seq 1 20); do
+            sleep 10
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 \
+              "https://${{ secrets.API_DOMAIN }}/health" || echo 000)
+            echo "attempt $i: /health -> $code"
+            [ "$code" = "200" ] && break
+            [ "$i" = "20" ] && { echo "::error::health check never returned 200"; exit 1; }
+          done
+
+          worker=$(ssh -i ~/.ssh/deploy_key -o BatchMode=yes \
+            "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" \
+            'cd /opt/txguard/backend/deploy/vm && docker compose logs --since 5m api | grep -c "Temporal worker started" || true')
+          echo "worker start lines in last 5m: $worker"
+          if [ "$worker" -lt 1 ]; then
+            echo "::error::Temporal worker did not connect after deploy"
+            exit 1
+          fi
