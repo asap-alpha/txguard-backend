@@ -80,12 +80,58 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Configure SSH
+      # Fail loudly and specifically when a secret is missing, rather than letting an
+      # empty value produce an unreadable ssh error three steps later.
+      - name: Check required secrets
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          API_DOMAIN: ${{ secrets.API_DOMAIN }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
         run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
+          missing=0
+          for v in DEPLOY_HOST DEPLOY_USER API_DOMAIN DEPLOY_SSH_KEY; do
+            if [ -z "${!v}" ]; then echo "::error::secret $v is not set"; missing=1; fi
+          done
+          [ "$missing" = "0" ] || exit 1
+          echo "all four secrets present"
+
+      - name: Configure SSH
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+
+          # printf (not echo) guarantees the trailing newline OpenSSH requires; a key
+          # pasted into the GitHub UI without one is rejected as "invalid format".
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -H "${{ secrets.DEPLOY_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
+
+          # Prove the key parses before using it, so a bad paste is reported here.
+          if ! ssh-keygen -y -f ~/.ssh/deploy_key > /dev/null 2>&1; then
+            echo "::error::DEPLOY_SSH_KEY is not a valid private key. Re-copy the WHOLE file including the BEGIN/END lines."
+            exit 1
+          fi
+          echo "private key parses OK"
+
+          # Not silenced: an empty known_hosts plus StrictHostKeyChecking=yes fails later
+          # with a confusing 'Host key verification failed'.
+          ssh-keyscan -T 10 "$DEPLOY_HOST" >> ~/.ssh/known_hosts
+          if [ ! -s ~/.ssh/known_hosts ]; then
+            echo "::error::ssh-keyscan returned nothing for $DEPLOY_HOST — host unreachable or port 22 filtered?"
+            exit 1
+          fi
+          echo "host key recorded"
+
+      - name: Verify SSH connectivity
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+        run: |
+          ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o ConnectTimeout=15 \
+            "$DEPLOY_USER@$DEPLOY_HOST" 'echo "connected as $(whoami) on $(hostname)"'
 
       # --delete keeps the server clean, and --exclude protects files that only
       # exist on the host: the .env holding every secret, and build artefacts.
