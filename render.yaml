@@ -1,0 +1,61 @@
+# Render Blueprint for the TxGuard backend (C# API + in-process Temporal worker + Postgres).
+#
+# PLACEMENT: a Blueprint file must sit at the ROOT of the connected Git repo.
+#   • If you connect the `backend/` folder as its own repo → this file is already correct.
+#   • If you connect the monorepo root (txguard-app/) → move this file up to that root and
+#     add `rootDir: backend` to the service below (paths stay relative to rootDir).
+#
+# NOT provisioned here: the Temporal SERVER. Use Temporal Cloud (recommended) or self-host
+# it separately, then set Temporal__Host / Temporal__Namespace and the auth vars below.
+
+databases:
+  - name: txguard-db
+    databaseName: txguard
+    user: txguard
+    plan: free            # free Postgres is deleted ~30 days after creation — upgrade for anything real
+
+services:
+  - type: web
+    name: txguard-api
+    runtime: docker
+    plan: free            # free web services sleep after ~15 min idle (cold starts on wake)
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      # App database — Render hands out a postgres:// URI; the API normalizes it and forces SSL.
+      - key: ConnectionStrings__Postgres
+        fromDatabase:
+          name: txguard-db
+          property: connectionString
+
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+
+      # JWT signing key — generated once by Render and kept stable across deploys.
+      - key: Auth__Jwt__SigningKey
+        generateValue: true
+
+      # ── Temporal Cloud connection (set these in the Render dashboard) ──────────
+      # mTLS host form:    <namespace>.<accountId>.tmprl.cloud:7233
+      # API-key host form: <region>.<cloud>.api.temporal.io:7233  (e.g. us-east-1.aws.api.temporal.io:7233)
+      - key: Temporal__Host
+        sync: false
+      - key: Temporal__Namespace         # e.g. txguard.abc12  (namespace.accountId)
+        sync: false
+
+      # Pick ONE auth mode:
+      #   (A) API key — simplest: set Temporal__ApiKey (Temporal__Tls__Enabled not needed).
+      - key: Temporal__ApiKey
+        sync: false
+      #   (B) mTLS — instead upload the client cert + key as Render Secret Files and set:
+      #         Temporal__Tls__Enabled=true
+      #         Temporal__Tls__ClientCertPath=/etc/secrets/temporal.pem
+      #         Temporal__Tls__ClientKeyPath=/etc/secrets/temporal.key
+      - key: Temporal__Tls__Enabled
+        sync: false
+
+      # Browser origin of the deployed frontend (Vercel). Add more with __1, __2, …
+      - key: Cors__AllowedOrigins__0
+        sync: false        # e.g. https://txguard.vercel.app

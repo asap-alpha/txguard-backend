@@ -1,0 +1,57 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{E2C61217-0070-4953-BF56-652EE51F512D}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TxGuard.Domain", "src\TxGuard.Domain\TxGuard.Domain.csproj", "{96095426-3DD6-44F4-B8FC-CB8BB44ABB9E}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TxGuard.Workflows", "src\TxGuard.Workflows\TxGuard.Workflows.csproj", "{B25B0E8C-9669-47AD-BC3C-1BA7D22ECE33}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TxGuard.Infrastructure", "src\TxGuard.Infrastructure\TxGuard.Infrastructure.csproj", "{3197B96A-2837-49D4-958D-B63C904FF405}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TxGuard.Api", "src\TxGuard.Api\TxGuard.Api.csproj", "{C3FEE448-73B7-4642-B428-F0E0BB2F1799}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{F5DECAFE-2838-43B7-866E-7F34E00274CA}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TxGuard.Tests", "tests\TxGuard.Tests\TxGuard.Tests.csproj", "{1E565233-8FFD-4DDB-B8E8-1BBE8B3988A1}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{96095426-3DD6-44F4-B8FC-CB8BB44ABB9E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{96095426-3DD6-44F4-B8FC-CB8BB44ABB9E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{96095426-3DD6-44F4-B8FC-CB8BB44ABB9E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{96095426-3DD6-44F4-B8FC-CB8BB44ABB9E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B25B0E8C-9669-47AD-BC3C-1BA7D22ECE33}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B25B0E8C-9669-47AD-BC3C-1BA7D22ECE33}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B25B0E8C-9669-47AD-BC3C-1BA7D22ECE33}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B25B0E8C-9669-47AD-BC3C-1BA7D22ECE33}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3197B96A-2837-49D4-958D-B63C904FF405}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3197B96A-2837-49D4-958D-B63C904FF405}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3197B96A-2837-49D4-958D-B63C904FF405}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3197B96A-2837-49D4-958D-B63C904FF405}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C3FEE448-73B7-4642-B428-F0E0BB2F1799}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C3FEE448-73B7-4642-B428-F0E0BB2F1799}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C3FEE448-73B7-4642-B428-F0E0BB2F1799}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C3FEE448-73B7-4642-B428-F0E0BB2F1799}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1E565233-8FFD-4DDB-B8E8-1BBE8B3988A1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1E565233-8FFD-4DDB-B8E8-1BBE8B3988A1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1E565233-8FFD-4DDB-B8E8-1BBE8B3988A1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1E565233-8FFD-4DDB-B8E8-1BBE8B3988A1}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{96095426-3DD6-44F4-B8FC-CB8BB44ABB9E} = {E2C61217-0070-4953-BF56-652EE51F512D}
+		{B25B0E8C-9669-47AD-BC3C-1BA7D22ECE33} = {E2C61217-0070-4953-BF56-652EE51F512D}
+		{3197B96A-2837-49D4-958D-B63C904FF405} = {E2C61217-0070-4953-BF56-652EE51F512D}
+		{C3FEE448-73B7-4642-B428-F0E0BB2F1799} = {E2C61217-0070-4953-BF56-652EE51F512D}
+		{1E565233-8FFD-4DDB-B8E8-1BBE8B3988A1} = {F5DECAFE-2838-43B7-866E-7F34E00274CA}
+	EndGlobalSection
+EndGlobal

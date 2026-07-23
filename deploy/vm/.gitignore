@@ -1,0 +1,2 @@
+# The filled-in .env holds the Aiven password, JWT signing key, and DB password.
+.env

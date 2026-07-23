@@ -1,0 +1,113 @@
+# TxGuard production stack for a single always-on VM (e.g. Oracle Cloud Always Free, ARM).
+#
+#   docker compose --env-file .env up -d --build
+#
+# Design notes:
+#   • Temporal's gRPC port is NEVER published. The API reaches it at temporal:7233 over the
+#     private compose network. This matters: Temporal has no authentication by default, so an
+#     internet-exposed 7233 would let anyone start, signal, or terminate workflows. Keeping the
+#     API on the same host removes the need for Temporal mTLS entirely.
+#   • Temporal keeps its OWN Postgres here, separate from the TxGuard application database on
+#     Aiven. Temporal persistence is high-churn cluster state (history, timers, task queues) and
+#     would exhaust Aiven's free plan (1 GB storage / 20 connections).
+#   • Only Caddy is public (80/443), terminating TLS and reverse-proxying to the API.
+#
+# All images below are multi-arch and run on arm64.
+
+name: txguard
+
+services:
+  # ── Temporal's own persistence (cluster state only, NOT application data) ──
+  temporal-postgres:
+    image: postgres:16
+    container_name: txguard-temporal-postgres
+    environment:
+      POSTGRES_USER: temporal
+      POSTGRES_PASSWORD: ${TEMPORAL_DB_PASSWORD:?set TEMPORAL_DB_PASSWORD in .env}
+    networks: [backend]
+    volumes:
+      - temporal-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U temporal"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  # ── Temporal server (internal only — no published ports) ──────────────────
+  temporal:
+    image: temporalio/auto-setup:1.29.1
+    container_name: txguard-temporal
+    depends_on:
+      temporal-postgres:
+        condition: service_healthy
+    environment:
+      - DB=postgres12                # driver name for PostgreSQL 12+ (incl. 16)
+      - DB_PORT=5432
+      - POSTGRES_USER=temporal
+      - POSTGRES_PWD=${TEMPORAL_DB_PASSWORD}
+      - POSTGRES_SEEDS=temporal-postgres
+      - DYNAMIC_CONFIG_FILE_PATH=config/dynamicconfig/production-sql.yaml
+    networks: [backend]
+    volumes:
+      - ./dynamicconfig:/etc/temporal/config/dynamicconfig
+    restart: unless-stopped
+
+  # ── Temporal Web UI (internal only — reach it via SSH tunnel, see README) ──
+  temporal-ui:
+    image: temporalio/ui:2.34.0
+    container_name: txguard-temporal-ui
+    depends_on: [temporal]
+    environment:
+      - TEMPORAL_ADDRESS=temporal:7233
+      - TEMPORAL_UI_PUBLIC_PATH=
+    networks: [backend]
+    restart: unless-stopped
+
+  # ── TxGuard API (hosts the in-process Temporal worker) ────────────────────
+  api:
+    build:
+      context: ../..                 # backend/ — needs all four projects + nuget.config
+      dockerfile: Dockerfile
+    image: txguard-api:latest
+    container_name: txguard-api
+    depends_on: [temporal]
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:8080
+      # Application data lives on Aiven; the URI form is normalized + SSL-forced in code.
+      - ConnectionStrings__Postgres=${AIVEN_POSTGRES_URI:?set AIVEN_POSTGRES_URI in .env}
+      # Private network address — no TLS needed, never leaves this host.
+      - Temporal__Host=temporal:7233
+      - Temporal__Namespace=default
+      - Auth__Jwt__SigningKey=${JWT_SIGNING_KEY:?set JWT_SIGNING_KEY in .env}
+      - Cors__AllowedOrigins__0=${FRONTEND_ORIGIN:?set FRONTEND_ORIGIN in .env}
+    networks: [backend]
+    restart: unless-stopped
+
+  # ── Public edge: automatic HTTPS via Let's Encrypt ─────────────────────────
+  caddy:
+    image: caddy:2
+    container_name: txguard-caddy
+    depends_on: [api]
+    environment:
+      - API_DOMAIN=${API_DOMAIN:?set API_DOMAIN in .env}
+      - ACME_EMAIL=${ACME_EMAIL:?set ACME_EMAIL in .env}
+    networks: [backend]
+    ports:
+      - "80:80"                      # required for the ACME HTTP challenge
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data              # persists certificates across restarts
+      - caddy-config:/config
+    restart: unless-stopped
+
+networks:
+  backend:
+    driver: bridge
+
+volumes:
+  temporal-pgdata:
+  caddy-data:
+  caddy-config:

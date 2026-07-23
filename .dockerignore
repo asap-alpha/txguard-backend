@@ -1,0 +1,13 @@
+# Keep the build context small and reproducible.
+**/bin/
+**/obj/
+**/.idea/
+**/.vs/
+**/*.user
+.git/
+.gitignore
+Dockerfile
+.dockerignore
+render.yaml
+**/appsettings.Development.json
+**/*.md

@@ -1,0 +1,9 @@
+# Temporal dynamic config for a SQL-persistence cluster without Elasticsearch.
+#
+# Deliberately omits `system.forceSearchAttributesCacheRefreshOnRead`, which Temporal's
+# sample dev config enables and explicitly warns against in production — it re-reads the
+# search-attribute cache on every request.
+
+limit.maxIDLength:
+  - value: 255
+    constraints: {}

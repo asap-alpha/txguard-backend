@@ -1,0 +1,27 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <ItemGroup>
+    <ProjectReference Include="..\TxGuard.Domain\TxGuard.Domain.csproj" />
+    <ProjectReference Include="..\TxGuard.Workflows\TxGuard.Workflows.csproj" />
+    <ProjectReference Include="..\TxGuard.Infrastructure\TxGuard.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.11" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.11">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="10.2.3" />
+    <PackageReference Include="Temporalio" Version="1.16.0" />
+    <PackageReference Include="Temporalio.Extensions.Hosting" Version="1.16.0" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>b941728b-24be-419d-a3ca-2c6dcc36a4ea</UserSecretsId>
+  </PropertyGroup>
+
+</Project>

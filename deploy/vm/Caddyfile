@@ -1,0 +1,17 @@
+# Public edge for the TxGuard API. Caddy obtains and renews a Let's Encrypt
+# certificate for {$API_DOMAIN} automatically (HTTP-01 challenge over port 80).
+#
+# The reverse_proxy directive upgrades WebSocket connections transparently, which
+# the SignalR hub at /hubs/transactions depends on.
+
+{
+	email {$ACME_EMAIL}
+}
+
+{$API_DOMAIN} {
+	encode gzip
+
+	reverse_proxy api:8080 {
+		health_uri /health
+	}
+}
