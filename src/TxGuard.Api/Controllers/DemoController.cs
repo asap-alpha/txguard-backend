@@ -13,29 +13,37 @@ namespace TxGuard.Api.Controllers;
 /// review, force retries / saga compensation, sever the database, and stop or start
 /// the Temporal worker.
 ///
-/// Every action 404s outside the Development environment — this surface must never
-/// be reachable in a real deployment.
+/// Every action 404s unless demo mode is on: automatically in the Development
+/// environment, or explicitly via <c>TxGuard:EnableDemoControls=true</c> for a
+/// deployed demo. This surface can sever the database and stop the worker, so it must
+/// never be left reachable in a real production deployment.
 /// </summary>
 [ApiController]
-[Authorize(Roles = Roles.Admin)]   // demo/chaos controls are Admin-only, on top of the Development gate
+[Authorize(Roles = Roles.Admin)]   // demo/chaos controls are Admin-only, on top of the demo-mode gate
 [Route("api/v1/demo")]
 public sealed class DemoController : ControllerBase, IActionFilter
 {
     private readonly IRuntimeSettings _settings;
     private readonly DbChaosService _db;
     private readonly ControllableWorkerHost _worker;
-    private readonly IHostEnvironment _env;
+    private readonly bool _demoEnabled;
 
     public DemoController(
         IRuntimeSettings settings,
         DbChaosService db,
         ControllableWorkerHost worker,
-        IHostEnvironment env)
+        IHostEnvironment env,
+        IConfiguration config)
     {
         _settings = settings;
         _db = db;
         _worker = worker;
-        _env = env;
+
+        // On in Development, or wherever the operator explicitly opts in. Keeping the flag
+        // separate from ASPNETCORE_ENVIRONMENT means a deployed demo can expose these
+        // controls without also flipping on Swagger, verbose errors, etc.
+        _demoEnabled = env.IsDevelopment()
+            || config.GetValue("TxGuard:EnableDemoControls", false);
     }
 
     // [NonAction] keeps the API explorer / Swagger from treating these filter hooks as
@@ -43,7 +51,7 @@ public sealed class DemoController : ControllerBase, IActionFilter
     [NonAction]
     public void OnActionExecuting(ActionExecutingContext context)
     {
-        if (!_env.IsDevelopment())
+        if (!_demoEnabled)
             context.Result = NotFound();
     }
 

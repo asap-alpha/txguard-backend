@@ -101,6 +101,13 @@ services:
       - Temporal__Namespace=default
       - Auth__Jwt__SigningKey=${JWT_SIGNING_KEY:?set JWT_SIGNING_KEY in .env}
       - Cors__AllowedOrigins__0=${FRONTEND_ORIGIN:?set FRONTEND_ORIGIN in .env}
+      # Exposes the failure-injection demo panel on this deployment. Admin-only, but the
+      # demo admin password is well-known, so treat this as a demo-only switch — turn it
+      # off (or set a real admin password) for anything beyond a controlled demonstration.
+      - TxGuard__EnableDemoControls=${ENABLE_DEMO_CONTROLS:-false}
+      # The DB-outage demo needs a maintenance database to stay connected through while the
+      # app database is sealed off. Aiven has no "postgres" DB, so we use a dedicated one.
+      - TxGuard__Demo__MaintenanceDatabase=${DEMO_MAINT_DB:-postgres}
     networks: [backend]
     restart: unless-stopped
 

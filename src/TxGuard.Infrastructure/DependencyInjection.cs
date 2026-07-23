@@ -47,7 +47,7 @@ public static class DependencyInjection
     /// <summary>Npgsql's out-of-the-box Maximum Pool Size, used to detect "caller didn't set one".</summary>
     private const int DefaultNpgsqlMaxPoolSize = 100;
 
-    internal static string NormalizePostgresConnectionString(string connectionString)
+    public static string NormalizePostgresConnectionString(string connectionString)
     {
         var isUri = connectionString.StartsWith("postgres://", StringComparison.OrdinalIgnoreCase)
                     || connectionString.StartsWith("postgresql://", StringComparison.OrdinalIgnoreCase);
