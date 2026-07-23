@@ -1,4 +1,5 @@
 using Npgsql;
+using TxGuard.Infrastructure;
 
 namespace TxGuard.Api.Demo;
 
@@ -19,14 +20,20 @@ public sealed class DbChaosService
 
     public DbChaosService(IConfiguration config)
     {
-        var appConnectionString = config.GetConnectionString("Postgres")
-            ?? "Host=localhost;Port=5433;Database=txguard;Username=txguard;Password=txguard";
+        // Normalize first: in production the configured string is Aiven's postgres:// URI,
+        // which NpgsqlConnectionStringBuilder cannot parse directly (it expects keyword form).
+        var appConnectionString = DependencyInjection.NormalizePostgresConnectionString(
+            config.GetConnectionString("Postgres")
+            ?? "Host=localhost;Port=5433;Database=txguard;Username=txguard;Password=txguard");
 
         var builder = new NpgsqlConnectionStringBuilder(appConnectionString);
         _appDatabase = builder.Database ?? "txguard";
 
-        // Same server, different database — so we stay connected while txguard is sealed off.
-        builder.Database = "postgres";
+        // Same server, different database — so we stay connected while the app DB is sealed
+        // off. Locally that's the always-present "postgres" maintenance DB; managed providers
+        // may not have one (Aiven has no "postgres" DB), so the name is configurable. Point it
+        // at any small database on the same server that is NOT the application database.
+        builder.Database = config["TxGuard:Demo:MaintenanceDatabase"] ?? "postgres";
         _maintenanceConnectionString = builder.ConnectionString;
     }
 
@@ -48,13 +55,19 @@ public sealed class DbChaosService
         await using var conn = new NpgsqlConnection(_maintenanceConnectionString);
         await conn.OpenAsync(ct);
 
+        // Connection limit 0 is the actual seal — it blocks all new connections, so the
+        // pool can't reconnect and the app database is effectively down.
         await using (var limit = new NpgsqlCommand(
             $"alter database \"{_appDatabase}\" connection limit 0", conn))
             await limit.ExecuteNonQueryAsync(ct);
 
+        // Then drop existing connections so the outage is immediate. Restrict to our own
+        // role: a non-superuser (e.g. Aiven's avnadmin) may not terminate the provider's
+        // internal backends, and trying would raise 42501 and abort the break. The app
+        // connects as this same role, so this still severs every application connection.
         await using var kill = new NpgsqlCommand(
             "select pg_terminate_backend(pid) from pg_stat_activity " +
-            "where datname = @db and pid <> pg_backend_pid()", conn);
+            "where datname = @db and pid <> pg_backend_pid() and usename = current_user", conn);
         kill.Parameters.AddWithValue("db", _appDatabase);
         await kill.ExecuteNonQueryAsync(ct);
     }
