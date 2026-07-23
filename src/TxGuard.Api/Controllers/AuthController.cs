@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using TxGuard.Api.Auth;
 using TxGuard.Api.Contracts;
 
@@ -25,7 +26,10 @@ public sealed class AuthController : ControllerBase
     }
 
     // ── Login (anonymous) ─────────────────────────────────────────────────
+    // Rate-limited harder than the rest of the API: this is the only anonymous entry
+    // point, so it is the natural target for credential stuffing.
     [AllowAnonymous]
+    [EnableRateLimiting("auth")]
     [HttpPost("login")]
     public IActionResult Login([FromBody] LoginRequest body)
     {

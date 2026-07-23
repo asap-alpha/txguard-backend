@@ -51,6 +51,16 @@ services:
     networks: [backend]
     volumes:
       - ./dynamicconfig:/etc/temporal/config/dynamicconfig
+    # The cluster takes ~30-60s to finish schema setup and start serving. Without this
+    # gate the API starts first, its single worker-connect attempt fails with "Frontend
+    # is not healthy yet", and the worker stays down until manually restarted.
+    # Note: Temporal binds to the container IP, not 127.0.0.1 — address it by name.
+    healthcheck:
+      test: ["CMD-SHELL", "temporal operator cluster health --address temporal:7233 | grep -q SERVING"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
     restart: unless-stopped
 
   # ── Temporal Web UI (internal only — reach it via SSH tunnel, see README) ──
@@ -71,7 +81,9 @@ services:
       dockerfile: Dockerfile
     image: txguard-api:latest
     container_name: txguard-api
-    depends_on: [temporal]
+    depends_on:
+      temporal:
+        condition: service_healthy
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
       - ASPNETCORE_URLS=http://+:8080
