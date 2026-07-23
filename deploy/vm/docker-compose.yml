@@ -63,7 +63,12 @@ services:
       start_period: 30s
     restart: unless-stopped
 
-  # ── Temporal Web UI (internal only — reach it via SSH tunnel, see README) ──
+  # ── Temporal Web UI ────────────────────────────────────────────────────────
+  # Bound to the VM's LOOPBACK only (127.0.0.1), never a public interface, because
+  # the UI has no authentication and can terminate/reset any workflow. Reach it with
+  # an SSH tunnel (see README §6): ssh -L 8233:localhost:8233 root@<vm> then open
+  # http://localhost:8233. This is not the same as publishing it — nothing outside
+  # the VM (or an SSH session into it) can connect.
   temporal-ui:
     image: temporalio/ui:2.34.0
     container_name: txguard-temporal-ui
@@ -72,6 +77,8 @@ services:
       - TEMPORAL_ADDRESS=temporal:7233
       - TEMPORAL_UI_PUBLIC_PATH=
     networks: [backend]
+    ports:
+      - "127.0.0.1:8233:8080"
     restart: unless-stopped
 
   # ── TxGuard API (hosts the in-process Temporal worker) ────────────────────
