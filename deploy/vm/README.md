@@ -156,11 +156,22 @@ DigitalOcean assigns the Droplet a fixed public IPv4 for its lifetime — that f
 what was missing when we deferred this decision earlier. In the Aiven console → service →
 **Service settings → IP filters**, replace `0.0.0.0/0` with:
 
-- `<droplet-ip>/32`
-- your own IP (`curl -s ifconfig.me`) for `psql` access
+- `<droplet-ip>/32` — **and nothing else**
 
-Note the IP changes if you destroy and recreate the Droplet; update this filter then,
-or you'll get connection timeouts that look like an application bug.
+Deliberately do *not* allowlist your own machine. Residential IPs are ISP-assigned and
+change, so that entry would break intermittently and send you back to the Aiven console.
+Instead reach the database *through* the VM, which is already allowlisted:
+
+```bash
+./db-tunnel.sh    # opens 127.0.0.1:15432 -> Aiven via the VM
+psql "host=127.0.0.1 port=15432 dbname=defaultdb user=avnadmin sslmode=require"
+```
+
+Aiven sees that connection as coming from the VM's address, so it works from any network.
+Verified: `select host(inet_client_addr())` returns the VM's IP, not your laptop's.
+
+The VM's IP is static for the life of the Droplet, but changes if you destroy and recreate
+it — update the filter then, or you'll get timeouts that look like an application bug.
 
 ## 8. Point Vercel at the API
 

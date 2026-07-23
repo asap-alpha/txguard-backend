@@ -3,7 +3,6 @@
 #
 # The reverse_proxy directive upgrades WebSocket connections transparently, which
 # the SignalR hub at /hubs/transactions depends on.
-
 {
 	email {$ACME_EMAIL}
 }
@@ -11,7 +10,36 @@
 {$API_DOMAIN} {
 	encode gzip
 
+	# ── Drop scanner probes at the edge ───────────────────────────────────
+	# Within minutes of going live this host was probed for /.env.production,
+	# /server.key and /.git/config. These paths will never be valid here, so close
+	# the connection rather than spending an API round trip on them.
+	@probes {
+		path /.env* /.git* /.aws* /.ssh* /config.json /config.xml /server.key
+		path /wp-admin* /wp-login* /phpmyadmin* /vendor/*
+		path *.php *.asp *.aspx *.cgi
+	}
+	abort @probes
+
+	# ── Security headers ──────────────────────────────────────────────────
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "no-referrer"
+		# This is a JSON API — it should never be rendered as a document.
+		Content-Security-Policy "default-src 'none'; frame-ancestors 'none'"
+		# Strip the framework fingerprint (Kestrel) from responses.
+		-Server
+		-X-Powered-By
+	}
+
 	reverse_proxy api:8080 {
 		health_uri /health
+
+		# Overwrite rather than append. Caddy would otherwise preserve a client-supplied
+		# X-Forwarded-For and append the real IP; overwriting makes it impossible for a
+		# caller to spoof their address and escape the API's per-IP rate limiter.
+		header_up X-Forwarded-For {remote_host}
 	}
 }

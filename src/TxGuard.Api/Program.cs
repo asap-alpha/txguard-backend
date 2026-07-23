@@ -1,8 +1,11 @@
 using System.Text;
 using System.Text.Json.Serialization;
+using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Temporalio.Extensions.Hosting;
@@ -155,6 +158,48 @@ builder.Services.AddCors(o => o.AddPolicy(CorsPolicy, p => p
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+// ── Reverse-proxy awareness ───────────────────────────────────────────────
+// Caddy terminates TLS and forwards over the private Docker network, so without this
+// every request appears to come from the proxy's IP — which would make the per-IP rate
+// limiter below partition everything into a single bucket. Clearing KnownProxies is safe
+// here precisely because the API is not reachable except through Caddy.
+builder.Services.Configure<ForwardedHeadersOptions>(o =>
+{
+    o.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    o.KnownNetworks.Clear();
+    o.KnownProxies.Clear();
+});
+
+// ── Rate limiting ─────────────────────────────────────────────────────────
+// The service is internet-facing and already being probed by scanners. A global per-IP
+// budget blunts scraping, and a much tighter budget on login makes credential stuffing
+// against the demo accounts impractical.
+const string AuthRateLimit = "auth";
+builder.Services.AddRateLimiter(o =>
+{
+    o.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    o.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(ctx =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 120,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+            }));
+
+    o.AddPolicy(AuthRateLimit, ctx =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 10,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+            }));
+});
+
 var app = builder.Build();
 
 // ── Ensure the read-model schema exists (dev convenience) ─────────────────
@@ -183,10 +228,19 @@ using (var scope = app.Services.CreateScope())
 }
 
 // ── Pipeline ──────────────────────────────────────────────────────────────
-app.UseSwagger();
-app.UseSwaggerUI();
+app.UseForwardedHeaders();
+
+// Swagger publishes the full API surface, including the admin endpoints. That is useful
+// locally and an unnecessary disclosure on a public host, so it is gated out of Production.
+if (!app.Environment.IsProduction())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
+
 app.UseCors(CorsPolicy);
 
+app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 
