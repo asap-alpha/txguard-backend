@@ -109,7 +109,22 @@ public sealed class TransactionsController : ControllerBase
             .Where(e => e.TransactionId == id).OrderBy(e => e.Id)
             .Select(e => e.ToDto()).ToListAsync();
 
-        return Ok(new TransactionDetailDto(tx.ToDto(), events));
+        // Surface whether this transfer has already been refunded. The dashboard refund
+        // button derives the refund's idempotency key deterministically from the original
+        // id ("refund-{id}"), so a single lookup finds the refund leg if one exists.
+        RefundLinkDto? refund = null;
+        if (tx.Type != TransactionType.Refund)
+        {
+            var refundKey = $"refund-{tx.TransactionId}";
+            var refundLeg = await db.Transactions.AsNoTracking()
+                .Where(t => t.IdempotencyKey == refundKey)
+                .Select(t => new { t.TransactionId, t.State })
+                .FirstOrDefaultAsync();
+            if (refundLeg is not null)
+                refund = new RefundLinkDto(refundLeg.TransactionId, refundLeg.State.ToString());
+        }
+
+        return Ok(new TransactionDetailDto(tx.ToDto(), events, refund));
     }
 
     // ── List transactions with paging + filter (FR-SQ-002) ────────────────
