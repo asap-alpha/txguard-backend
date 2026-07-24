@@ -84,6 +84,14 @@ public sealed record LoginResponse(
 /// <summary>GET /api/v1/auth/me — the caller's identity as read from their token.</summary>
 public sealed record MeResponse(string Username, string DisplayName, string Role);
 
+/// <summary>GET /api/v1/meta — operational limits an integrator needs to build against.</summary>
+public sealed record MetaResponse(
+    long MaxAmountMinor,
+    string Currency,
+    double LowRiskThreshold,
+    double HighRiskThreshold,
+    int IdempotencyWindowHours);
+
 // ── Admin: API keys ─────────────────────────────────────────────────────────
 
 /// <summary>POST /api/v1/admin/api-keys — issue a key for a partner/integrator.</summary>

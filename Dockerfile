@@ -1,5 +1,7 @@
-# syntax=docker/dockerfile:1
 # Multi-stage build for the TxGuard API (which also hosts the in-process Temporal worker).
+# (No `# syntax=` directive: it forces a fetch of the dockerfile frontend from Docker Hub on
+# every build, which fails the whole build when the registry hiccups — 502s. The built-in
+# frontend handles this standard multi-stage Dockerfile fine.)
 # Build context MUST be the `backend/` directory so all four projects + nuget.config are visible.
 
 # ── Build ───────────────────────────────────────────────────────────────────
