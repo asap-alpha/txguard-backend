@@ -32,7 +32,8 @@ public sealed record TransactionDto(
     long AmountMinor, string Currency, string Type,
     string State, string? FailureReason, int Retries,
     double? RiskScore, string? RiskLevel, string? FraudModelVersion,
-    DateTime CreatedAtUtc, DateTime UpdatedAtUtc);
+    DateTime CreatedAtUtc, DateTime UpdatedAtUtc,
+    string? Reference);
 
 /// <summary>Audit event row (SRS §3.5 / demo Audit Log).</summary>
 public sealed record AuditEventDto(

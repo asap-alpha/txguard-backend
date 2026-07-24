@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using TxGuard.Domain.Enums;
 
 namespace TxGuard.Infrastructure.Persistence;
 
@@ -33,7 +34,13 @@ public class TxGuardDbContext : DbContext
             e.HasIndex(x => x.TransactionId);
             e.HasIndex(x => x.EventType);
             e.HasIndex(x => x.TimestampUtc);
-            e.Property(x => x.EventType).HasConversion<string>().HasMaxLength(48);
+            // Tolerant conversion: an audit row whose EventType this build doesn't know
+            // (schema drift, hand-edited data) reads back as Unknown instead of throwing and
+            // 500-ing the whole transaction detail view. The audit log is append-only display
+            // data, so degrading one label is strictly better than failing the request.
+            e.Property(x => x.EventType)
+                .HasConversion(new TolerantEnumToStringConverter<AuditEventType>(AuditEventType.Unknown))
+                .HasMaxLength(48);
             e.Property(x => x.PreviousState).HasConversion<string>().HasMaxLength(32);
             e.Property(x => x.NewState).HasConversion<string>().HasMaxLength(32);
             e.HasOne<TransactionEntity>()

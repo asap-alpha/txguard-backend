@@ -115,7 +115,8 @@ public sealed class TransactionsController : ControllerBase
     // ── List transactions with paging + filter (FR-SQ-002) ────────────────
     [HttpGet]
     public async Task<IActionResult> List(
-        [FromQuery] string? status, [FromQuery] int? page, [FromQuery] int? pageSize)
+        [FromQuery] string? status, [FromQuery] string? type,
+        [FromQuery] int? page, [FromQuery] int? pageSize)
     {
         var p = page is null or <= 0 ? 1 : page.Value;
         var ps = pageSize is null or <= 0 or > 200 ? 25 : pageSize.Value;
@@ -124,6 +125,8 @@ public sealed class TransactionsController : ControllerBase
         var q = db.Transactions.AsNoTracking().OrderByDescending(t => t.CreatedAtUtc).AsQueryable();
         if (!string.IsNullOrWhiteSpace(status) && Enum.TryParse<TransactionState>(status, true, out var st))
             q = q.Where(t => t.State == st);
+        if (!string.IsNullOrWhiteSpace(type) && Enum.TryParse<TransactionType>(type, true, out var ty))
+            q = q.Where(t => t.Type == ty);
 
         var total = await q.CountAsync();
         var items = await q.Skip((p - 1) * ps).Take(ps)
