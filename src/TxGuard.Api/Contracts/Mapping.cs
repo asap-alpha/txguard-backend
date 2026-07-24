@@ -11,7 +11,8 @@ public static class Mapping
         t.AmountMinor, t.Currency, t.Type.ToString(),
         t.State.ToString(), t.FailureReason, t.Retries,
         t.RiskScore, t.RiskLevel?.ToString(), t.FraudModelVersion,
-        t.CreatedAtUtc, t.UpdatedAtUtc);
+        t.CreatedAtUtc, t.UpdatedAtUtc,
+        t.Reference);
 
     public static AuditEventDto ToDto(this AuditEventEntity e) => new(
         e.Id, e.TransactionId, e.EventType.ToString(),

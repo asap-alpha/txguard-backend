@@ -32,7 +32,8 @@ public sealed record TransactionDto(
     long AmountMinor, string Currency, string Type,
     string State, string? FailureReason, int Retries,
     double? RiskScore, string? RiskLevel, string? FraudModelVersion,
-    DateTime CreatedAtUtc, DateTime UpdatedAtUtc);
+    DateTime CreatedAtUtc, DateTime UpdatedAtUtc,
+    string? Reference);
 
 /// <summary>Audit event row (SRS §3.5 / demo Audit Log).</summary>
 public sealed record AuditEventDto(
@@ -82,6 +83,14 @@ public sealed record LoginResponse(
 
 /// <summary>GET /api/v1/auth/me — the caller's identity as read from their token.</summary>
 public sealed record MeResponse(string Username, string DisplayName, string Role);
+
+/// <summary>GET /api/v1/meta — operational limits an integrator needs to build against.</summary>
+public sealed record MetaResponse(
+    long MaxAmountMinor,
+    string Currency,
+    double LowRiskThreshold,
+    double HighRiskThreshold,
+    int IdempotencyWindowHours);
 
 // ── Admin: API keys ─────────────────────────────────────────────────────────
 

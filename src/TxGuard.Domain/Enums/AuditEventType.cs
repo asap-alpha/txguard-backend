@@ -6,6 +6,14 @@ namespace TxGuard.Domain.Enums;
 /// </summary>
 public enum AuditEventType
 {
+    /// <summary>
+    /// Fallback for an event type persisted by an older/newer schema (or bad data) that
+    /// this build does not recognise. Never written by the app; it exists so reading the
+    /// audit log can degrade to a label instead of failing the whole request. Kept last so
+    /// the ordinals of the real events are unaffected.
+    /// </summary>
+    Unknown = -1,
+
     TransactionCreated,
     FraudScored,
     FraudReviewQueued,
