@@ -41,8 +41,14 @@ public sealed record AuditEventDto(
     string? PreviousState, string? NewState,
     string? Details, string? DataJson, DateTime TimestampUtc);
 
-/// <summary>Full transaction detail with its event history.</summary>
-public sealed record TransactionDetailDto(TransactionDto Transaction, IReadOnlyList<AuditEventDto> Events);
+/// <summary>Pointer to the refund transaction spawned from a Completed transfer, so the
+/// UI can show it was refunded instead of only discovering it on a failed re-refund.</summary>
+public sealed record RefundLinkDto(string TransactionId, string State);
+
+/// <summary>Full transaction detail with its event history. <paramref name="Refund"/> is
+/// set when this transaction has already been refunded (points at the refund leg).</summary>
+public sealed record TransactionDetailDto(
+    TransactionDto Transaction, IReadOnlyList<AuditEventDto> Events, RefundLinkDto? Refund = null);
 
 /// <summary>Analyst decision for a FRAUD_REVIEW transaction (FR-AI-003).</summary>
 public sealed record FraudDecisionRequest([Required] string Decision); // "Approve" | "Reject"
