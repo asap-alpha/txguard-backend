@@ -104,6 +104,26 @@ public static class DependencyInjection
             builder.MaxPoolSize = 10;
         }
 
+        // Remote managed Postgres is reached over the public internet, across NAT/stateful
+        // firewalls that silently drop idle TCP sockets. A pooled connection left idle then
+        // looks alive but the next command hangs until it times out. Two guards, applied only
+        // when the caller hasn't set them (0 / 300 are Npgsql's "unset" defaults):
+        //   • KeepAlive sends TCP keepalive probes so the socket never goes idle long enough
+        //     for an intermediary to reap it.
+        //   • ConnectionIdleLifetime prunes a pooled connection well before the server or
+        //     network would, so we never hand a stale one to a query.
+        if (!isLocal)
+        {
+            if (builder.KeepAlive == 0)
+            {
+                builder.KeepAlive = 30;
+            }
+            if (builder.ConnectionIdleLifetime == 300)
+            {
+                builder.ConnectionIdleLifetime = 60;
+            }
+        }
+
         return builder.ConnectionString;
     }
 }
