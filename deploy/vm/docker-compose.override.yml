@@ -1,0 +1,13 @@
+# Override for a VPS that ALREADY runs nginx on ports 80/443 (co-tenant host).
+# docker compose auto-merges this file. It:
+#   • publishes the API on the host loopback (127.0.0.1:8080) so the host's nginx
+#     can reverse-proxy to it — nothing else on the box or internet can reach it;
+#   • disables the bundled Caddy (the host nginx terminates TLS instead) by parking
+#     it behind an inactive profile so `docker compose up` never starts it.
+services:
+  api:
+    ports:
+      - "127.0.0.1:8080:8080"
+
+  caddy:
+    profiles: ["disabled"]   # never started unless this profile is explicitly enabled
