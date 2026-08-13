@@ -105,7 +105,10 @@ Fill these (the random secrets are already set by bootstrap):
 - `FRONTEND_ORIGIN` — the Vercel URL **[OWNER provides]**
 - `AIVEN_POSTGRES_URI` — the database URI **[OWNER provides]**
 
-Leave `ENABLE_DEMO_CONTROLS=true` and `DEMO_MAINT_DB=txguard_maint` as scaffolded.
+Leave `ENABLE_DEMO_CONTROLS=true`, `DEMO_MAINT_DB=txguard_maint` and `ENABLE_SWAGGER=true`
+as scaffolded. The last of those serves the interactive API reference at
+`https://<your-domain>/swagger`; set it to `false` if this deployment should not publish
+its route table.
 
 Then launch:
 ```bash

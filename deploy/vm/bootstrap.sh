@@ -52,6 +52,9 @@ else
   # Enable the demo panel + point the outage demo at the Aiven maintenance DB.
   grep -q '^ENABLE_DEMO_CONTROLS=' .env || echo 'ENABLE_DEMO_CONTROLS=true' >> .env
   grep -q '^DEMO_MAINT_DB=' .env       || echo 'DEMO_MAINT_DB=txguard_maint' >> .env
+  # Publish the interactive API reference at /swagger. Safe: it discloses the route
+  # table but weakens no gate. Set to false for a non-demo deployment.
+  grep -q '^ENABLE_SWAGGER=' .env      || echo 'ENABLE_SWAGGER=true' >> .env
   echo "    created .env with random TEMPORAL_DB_PASSWORD + JWT_SIGNING_KEY"
   echo "    >>> STILL EDIT .env: API_DOMAIN, ACME_EMAIL, FRONTEND_ORIGIN, AIVEN_POSTGRES_URI"
 fi

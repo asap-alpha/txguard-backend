@@ -105,6 +105,11 @@ services:
       # demo admin password is well-known, so treat this as a demo-only switch — turn it
       # off (or set a real admin password) for anything beyond a controlled demonstration.
       - TxGuard__EnableDemoControls=${ENABLE_DEMO_CONTROLS:-false}
+      # Serves the interactive API reference at /swagger on this deployment. Off by
+      # default: it publishes the whole route table, including the admin routes. It
+      # weakens no gate (every endpoint still enforces its roles), so it is safe to turn
+      # on for a demo or for partner integrators.
+      - TxGuard__EnableSwagger=${ENABLE_SWAGGER:-false}
       # The DB-outage demo needs a maintenance database to stay connected through while the
       # app database is sealed off. Aiven has no "postgres" DB, so we use a dedicated one.
       - TxGuard__Demo__MaintenanceDatabase=${DEMO_MAINT_DB:-postgres}

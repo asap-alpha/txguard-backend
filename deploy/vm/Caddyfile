@@ -34,6 +34,16 @@
 		-X-Powered-By
 	}
 
+	# ── Swagger UI exception ──────────────────────────────────────────────
+	# Swagger UI is the one route that IS a document: it loads its own stylesheet and
+	# bundle and configures itself from an inline script. The API-wide `default-src
+	# 'none'` above would render it as a blank page, so these paths get a policy that
+	# permits same-origin assets and nothing else. Still no external origins, and
+	# frame-ancestors stays 'none'. Harmless when TxGuard__EnableSwagger is false —
+	# the paths simply 404.
+	@swagger path /swagger /swagger/*
+	header @swagger Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'"
+
 	reverse_proxy api:8080 {
 		health_uri /health
 
