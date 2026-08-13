@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi;
 using Temporalio.Extensions.Hosting;
 using TxGuard.Api;
 using TxGuard.Api.Auth;
@@ -156,7 +157,48 @@ builder.Services.AddCors(o => o.AddPolicy(CorsPolicy, p => p
     .AllowAnyHeader().AllowAnyMethod().AllowCredentials()));
 
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(o =>
+{
+    o.SwaggerDoc("v1", new OpenApiInfo
+    {
+        Title = "TxGuard API",
+        Version = "v1",
+        Description =
+            "Durable transaction engine. Every endpoint except /api/v1/auth/login and /health "
+            + "requires authentication: a bearer token for a human operator, or an X-Api-Key "
+            + "header for a machine integrator. Amounts are always in minor units (pesewas), "
+            + "so 125000 is GH₵1,250.00.",
+    });
+
+    // Without these the UI can only ever produce 401s: it has no way to attach a
+    // credential to a "Try it out" call. Both schemes are declared because the API
+    // genuinely accepts both, chosen per request by the policy scheme above.
+    o.AddSecurityDefinition("bearer", new OpenApiSecurityScheme
+    {
+        Name = "Authorization",
+        Type = SecuritySchemeType.Http,
+        Scheme = "bearer",
+        BearerFormat = "JWT",
+        In = ParameterLocation.Header,
+        Description = "Paste the token returned by POST /api/v1/auth/login (no \"Bearer \" prefix).",
+    });
+    o.AddSecurityDefinition(ApiKeyAuthenticationHandler.SchemeName, new OpenApiSecurityScheme
+    {
+        Name = ApiKeyAuthenticationHandler.HeaderName,
+        Type = SecuritySchemeType.ApiKey,
+        In = ParameterLocation.Header,
+        Description = "An integrator key issued from /api/v1/admin/api-keys (txg_live_…).",
+    });
+
+    // Applied to every operation. Either credential satisfies it, which mirrors the
+    // policy scheme: an X-Api-Key header wins, otherwise the bearer token is used.
+    o.AddSecurityRequirement(document => new OpenApiSecurityRequirement
+    {
+        [new OpenApiSecuritySchemeReference("bearer", document)] = new List<string>(),
+        [new OpenApiSecuritySchemeReference(ApiKeyAuthenticationHandler.SchemeName, document)] =
+            new List<string>(),
+    });
+});
 
 // ── Reverse-proxy awareness ───────────────────────────────────────────────
 // Caddy terminates TLS and forwards over the private Docker network, so without this
@@ -231,11 +273,22 @@ using (var scope = app.Services.CreateScope())
 app.UseForwardedHeaders();
 
 // Swagger publishes the full API surface, including the admin endpoints. That is useful
-// locally and an unnecessary disclosure on a public host, so it is gated out of Production.
-if (!app.Environment.IsProduction())
+// locally and an unnecessary disclosure on a public host, so Production serves it only
+// when an operator explicitly opts in (TxGuard:EnableSwagger). The flag is kept separate
+// from ASPNETCORE_ENVIRONMENT so a demo deployment can expose the API reference without
+// also switching on developer exception pages and the rest of the Development behaviour.
+//
+// Enabling it discloses the route table (including admin routes) to anyone who looks. It
+// does not weaken any gate: every endpoint still enforces [Authorize] and its roles.
+if (!app.Environment.IsProduction() ||
+    app.Configuration.GetValue("TxGuard:EnableSwagger", false))
 {
     app.UseSwagger();
-    app.UseSwaggerUI();
+    app.UseSwaggerUI(o =>
+    {
+        o.SwaggerEndpoint("/swagger/v1/swagger.json", "TxGuard API v1");
+        o.DocumentTitle = "TxGuard API";
+    });
 }
 
 app.UseCors(CorsPolicy);

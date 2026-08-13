@@ -133,6 +133,23 @@ curl https://<your-domain>/health
 # {"status":"ok","service":"TxGuard"}
 ```
 
+### Interactive API reference (optional)
+
+With `ENABLE_SWAGGER=true` in `.env`, Swagger UI is served at
+`https://<your-domain>/swagger`. It lists every endpoint, and its **Authorize** button
+accepts either credential the API takes, so an integrator can exercise the API from the
+browser:
+
+- **bearer** — the token from `POST /api/v1/auth/login` (paste the token only, no `Bearer ` prefix)
+- **ApiKey** — an integrator key (`txg_live_…`), sent as `X-Api-Key`
+
+Enabling it publishes the full route table, including the admin routes. It weakens no
+gate: every endpoint still enforces authentication and its roles. Leave it `false` for a
+deployment that is not meant to be explored.
+
+Unlike the Temporal UI below, this is safe to expose, because it is a description of the
+API rather than a control plane for it.
+
 ## 6. Reach the Temporal UI
 
 The UI is deliberately **not** published — it can terminate workflows and has no auth.
